@@ -10,28 +10,41 @@
 
   const products = [
     {
-      id: "nasi-goreng",
-      name: "Nasi Goreng Spesial",
+      id: "bite-burger",
+      name: "Bite Burger",
       category: "makanan",
-      price: 12000,
-      sold: 268,
+      price: 10000,
+      service: 2,
+      sold: 284,
       available: true,
-      description: "Nasi goreng telur dengan kerupuk, acar timun, dan sambal bawang.",
+      description: "Roti panggang, patty ayam, saus bite, dan selada. Paling cepat keluar dari dapur.",
     },
     {
       id: "mie-goreng",
       name: "Mie Goreng Jawa",
       category: "makanan",
       price: 10000,
-      sold: 241,
+      service: 4,
+      sold: 251,
       available: true,
-      description: "Mie basah bumbu bawang dengan telur, sawi, dan irisan ayam.",
+      description: "Mie basah bumbu bawang, telur, sawi, dan irisan ayam.",
+    },
+    {
+      id: "nasi-goreng",
+      name: "Nasi Goreng Spesial",
+      category: "makanan",
+      price: 12000,
+      service: 5,
+      sold: 268,
+      available: true,
+      description: "Nasi goreng telur dengan kerupuk, acar timun, dan sambal bawang.",
     },
     {
       id: "ayam-geprek",
       name: "Ayam Geprek Sambal Bawang",
       category: "makanan",
       price: 13000,
+      service: 5,
       sold: 312,
       available: true,
       description: "Ayam tepung digeprek sambal bawang, disajikan dengan nasi hangat.",
@@ -41,6 +54,7 @@
       name: "Bakso Urat Kuah",
       category: "makanan",
       price: 12000,
+      service: 3,
       sold: 187,
       available: true,
       description: "Lima butir bakso urat dalam kuah kaldu sapi, mi kuning, dan seledri.",
@@ -50,6 +64,7 @@
       name: "Nasi Uduk Komplit",
       category: "makanan",
       price: 11000,
+      service: 4,
       sold: 143,
       available: true,
       description: "Nasi uduk gurih dengan bihun goreng, tempe orek, dan sambal kacang.",
@@ -59,6 +74,7 @@
       name: "Sate Ayam Madura",
       category: "makanan",
       price: 14000,
+      service: 6,
       sold: 96,
       available: false,
       description: "Sepuluh tusuk sate ayam dengan bumbu kacang, lontong, dan bawang goreng.",
@@ -68,6 +84,7 @@
       name: "Es Teh Manis",
       category: "minuman",
       price: 4000,
+      service: 1,
       sold: 412,
       available: true,
       description: "Teh tubruk diseduh pekat, disajikan dingin dengan es batu.",
@@ -77,6 +94,7 @@
       name: "Es Jeruk Peras",
       category: "minuman",
       price: 5000,
+      service: 1,
       sold: 224,
       available: true,
       description: "Jeruk peras segar dengan gula batu dan es serut.",
@@ -86,6 +104,7 @@
       name: "Air Mineral Dingin",
       category: "minuman",
       price: 3000,
+      service: 1,
       sold: 356,
       available: true,
       description: "Air mineral botol 600 ml, disimpan di lemari pendingin.",
@@ -95,6 +114,7 @@
       name: "Kopi Susu Gula Aren",
       category: "minuman",
       price: 9000,
+      service: 2,
       sold: 88,
       available: true,
       description: "Espresso dengan susu segar dan gula aren cair.",
@@ -104,15 +124,27 @@
       name: "Es Campur",
       category: "minuman",
       price: 8000,
+      service: 2,
       sold: 118,
       available: true,
       description: "Serutan es dengan cincau, kelapa muda, kolang-kaling, dan sirup gula merah.",
+    },
+    {
+      id: "kentang",
+      name: "Kentang Goreng",
+      category: "snack",
+      price: 7000,
+      service: 3,
+      sold: 231,
+      available: true,
+      description: "Kentang potong lurus, digoreng garing, ditaburi bumbu asin gurih.",
     },
     {
       id: "pisang-keju",
       name: "Pisang Goreng Keju",
       category: "snack",
       price: 6000,
+      service: 3,
       sold: 174,
       available: true,
       description: "Dua potong pisang goreng dengan topping keju parut dan susu kental manis.",
@@ -122,6 +154,7 @@
       name: "Risoles Mayo",
       category: "snack",
       price: 7000,
+      service: 3,
       sold: 103,
       available: true,
       description: "Risoles isi smoked beef, telur rebus, dan mayones.",
@@ -131,23 +164,17 @@
       name: "Tahu Isi Sayur",
       category: "snack",
       price: 4000,
+      service: 2,
       sold: 152,
       available: true,
       description: "Tiga buah tahu isi sayur goreng, disajikan dengan cabai rawit.",
     },
-    {
-      id: "kerupuk",
-      name: "Kerupuk Kaleng",
-      category: "snack",
-      price: 2500,
-      sold: 287,
-      available: true,
-      description: "Kerupuk kanji renyah, teman makan nasi goreng dan bakso.",
-    },
   ];
 
-  const BASE_PRODUCTS = products.map((product) => Object.assign({}, product));
-  const inventoryListeners = new Set();
+  const BASE = products.map((product) => Object.assign({}, product));
+  const listeners = new Set();
+  const byIdMap = new Map();
+  const categoryMap = new Map(categories.map((category) => [category.id, category]));
 
   function safe(fn) {
     try {
@@ -157,215 +184,196 @@
     }
   }
 
-  const CATALOG_KEY = SC.config.keys.catalog;
-  const byIdMap = new Map();
-  const categoryMap = new Map(categories.map((category) => [category.id, category]));
-  const codeMap = new Map();
-  const bestSellers = new Set();
-
   function rebuildIndexes() {
     byIdMap.clear();
-    codeMap.clear();
-    products.forEach((product, index) => {
-      byIdMap.set(product.id, product);
-      codeMap.set(product.id, String(index + 1).padStart(2, "0"));
-    });
-
-    bestSellers.clear();
-    products
-      .filter((product) => product.sold > 0)
-      .slice()
-      .sort((a, b) => b.sold - a.sold)
-      .slice(0, 3)
-      .forEach((product) => bestSellers.add(product.id));
+    products.forEach((product) => byIdMap.set(product.id, product));
   }
 
-  function validProduct(raw) {
+  function valid(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     if (!/^[a-z0-9-]{3,60}$/.test(String(raw.id || ""))) return null;
     if (typeof raw.name !== "string" || typeof raw.description !== "string") return null;
-    if (!categoryMap.has(raw.category)) return null;
+    if (!categoryMap.has(raw.category) || categoryMap.get(raw.category).id === "semua") return null;
     const price = Math.floor(Number(raw.price));
     if (!Number.isSafeInteger(price) || price < 500 || price > 250000) return null;
+    const service = Number(raw.service);
+    if (!Number.isFinite(service) || service < 0.5 || service > 30) return null;
     const name = raw.name.trim().replace(/\s+/g, " ");
     const description = raw.description.trim().replace(/\s+/g, " ");
-    if (name.length < 2 || name.length > 48 || description.length < 8 || description.length > 180) return null;
-
+    if (name.length < 2 || name.length > 48) return null;
+    if (description.length < 8 || description.length > 180) return null;
     return {
       id: String(raw.id),
       name,
       category: raw.category,
       price,
+      service: Math.round(service * 2) / 2,
       sold: Math.max(0, Math.floor(Number(raw.sold) || 0)),
       available: typeof raw.available === "boolean" ? raw.available : true,
       description,
     };
   }
 
-  function saveCatalog() {
+  function save() {
     safe(() =>
-      window.localStorage.setItem(
-        CATALOG_KEY,
-        JSON.stringify(products.map((product) => Object.assign({}, product)))
-      )
+      window.localStorage.setItem(SC.config.keys.catalog, JSON.stringify(products.map((product) => Object.assign({}, product))))
     );
   }
 
-  function loadCatalog() {
-    const stored = safe(() => JSON.parse(window.localStorage.getItem(CATALOG_KEY) || "null"));
-    products.splice(0, products.length, ...BASE_PRODUCTS.map((product) => Object.assign({}, product)));
-    if (!Array.isArray(stored)) {
-      rebuildIndexes();
-      return;
+  function load() {
+    const stored = safe(() => JSON.parse(window.localStorage.getItem(SC.config.keys.catalog) || "null"));
+    products.splice(0, products.length, ...BASE.map((product) => Object.assign({}, product)));
+    if (Array.isArray(stored)) {
+      const base = new Map(products.map((product) => [product.id, product]));
+      const updated = new Map();
+      const custom = new Map();
+      stored.forEach((raw) => {
+        const product = valid(raw);
+        if (!product) return;
+        if (base.has(product.id)) updated.set(product.id, product);
+        else if (product.id.startsWith("custom-") && !custom.has(product.id)) custom.set(product.id, product);
+      });
+      products.forEach((product, index) => {
+        const saved = updated.get(product.id);
+        if (saved) products[index] = saved;
+      });
+      products.push(...custom.values());
     }
-
-    const baseById = new Map(products.map((product) => [product.id, product]));
-    const updated = new Map();
-    const custom = new Map();
-
-    stored.forEach((raw) => {
-      const product = validProduct(raw);
-      if (!product) return;
-      if (baseById.has(product.id)) updated.set(product.id, product);
-      else if (product.id.startsWith("custom-") && !custom.has(product.id)) custom.set(product.id, product);
-    });
-
-    products.forEach((product, index) => {
-      const saved = updated.get(product.id);
-      if (saved) products[index] = saved;
-    });
-    products.push(...custom.values());
     rebuildIndexes();
   }
 
-  loadCatalog();
+  function emit() {
+    const snapshot = list();
+    listeners.forEach((listener) => listener(snapshot));
+  }
+
+  function commit() {
+    rebuildIndexes();
+    save();
+    emit();
+  }
+
+  load();
 
   const sorters = {
     populer: (a, b) => b.sold - a.sold || a.name.localeCompare(b.name, "id"),
+    cepat: (a, b) => a.service - b.service || a.price - b.price,
     murah: (a, b) => a.price - b.price || a.name.localeCompare(b.name, "id"),
-    mahal: (a, b) => b.price - a.price || a.name.localeCompare(b.name, "id"),
     nama: (a, b) => a.name.localeCompare(b.name, "id"),
   };
 
-  function byId(id) {
-    return byIdMap.get(id) || null;
-  }
-
-  function code(id) {
-    return codeMap.get(id) || "00";
-  }
-
-  function isBestSeller(id) {
-    return bestSellers.has(id);
-  }
-
-  function categoryOf(id) {
-    return categoryMap.get(id) || categories[0];
-  }
-
-  function setAvailability(id, available) {
-    const product = byId(id);
-    if (!product || typeof available !== "boolean") return null;
-    if (product.available === available) return product;
-    product.available = available;
-    saveCatalog();
-    inventoryListeners.forEach((listener) => listener(products));
-    return product;
-  }
-
-  function saveProduct(draft, productId) {
-    if (!draft || typeof draft !== "object") return { error: "Data menu tidak valid" };
-    const current = productId ? byId(productId) : null;
-    if (productId && !current) return { error: "Menu tidak ditemukan" };
-
-    const category = String(draft.category || "");
-    const price = Number(draft.price);
-    const product = validProduct({
-      id: current ? current.id : `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      name: String(draft.name || ""),
-      category,
-      price,
-      sold: current ? current.sold : 0,
-      available: current ? current.available : true,
-      description: String(draft.description || ""),
-    });
-
-    if (!product) {
-      return {
-        error: "Periksa kembali nama, kategori, harga Rp500–Rp250.000, dan deskripsi (8–180 karakter).",
-      };
-    }
-
-    if (current) {
-      products[products.indexOf(current)] = product;
-    } else {
-      products.push(product);
-    }
-
-    rebuildIndexes();
-    saveCatalog();
-    inventoryListeners.forEach((listener) => listener(products));
-    return { product };
-  }
-
-  function removeProduct(productId) {
-    const product = byId(productId);
-    if (!product) return { error: "Menu tidak ditemukan" };
-    if (!productId.startsWith("custom-")) {
-      return { error: "Menu bawaan tidak dapat dihapus; ubah saja ketersediaannya" };
-    }
-
-    const referenced = SC.orders
-      .list()
-      .some((order) => order.items.some((item) => item.productId === productId));
-    if (referenced) {
-      return { error: "Menu ini sudah dipakai di pesanan. Tandai habis agar riwayat tetap utuh." };
-    }
-
-    products.splice(products.indexOf(product), 1);
-    rebuildIndexes();
-    saveCatalog();
-    inventoryListeners.forEach((listener) => listener(products));
-    return { product };
-  }
-
-  function subscribeInventory(listener) {
-    inventoryListeners.add(listener);
-    return () => inventoryListeners.delete(listener);
-  }
-
   function list(options) {
-    const { category = "semua", query = "", sort = "populer" } = options || {};
-    const keyword = query.trim().toLowerCase();
-    const sorter = sorters[sort] || sorters.populer;
-
+    const settings = options || {};
+    const query = String(settings.query || "")
+      .trim()
+      .toLowerCase();
+    const category = settings.category || "semua";
+    const sorter = sorters[settings.sort] || sorters.populer;
     return products
-      .filter((product) => {
-        if (category !== "semua" && product.category !== category) return false;
-        if (!keyword) return true;
-        return `${product.name} ${product.description}`.toLowerCase().includes(keyword);
-      })
+      .filter((product) => category === "semua" || product.category === category)
+      .filter((product) => !query || product.name.toLowerCase().includes(query) || product.description.toLowerCase().includes(query))
+      .slice()
       .sort(sorter);
   }
 
-  window.addEventListener("storage", (event) => {
-    if (event.key === CATALOG_KEY) {
-      loadCatalog();
-      inventoryListeners.forEach((listener) => listener(products));
+  function byId(id) {
+    return byIdMap.get(String(id)) || null;
+  }
+
+  function category(id) {
+    return categoryMap.get(String(id)) || null;
+  }
+
+  function bestSellers(limit) {
+    return products
+      .slice()
+      .sort(sorters.populer)
+      .slice(0, limit || 4);
+  }
+
+  function fastest(limit) {
+    return products
+      .filter((product) => product.available)
+      .slice()
+      .sort(sorters.cepat)
+      .slice(0, limit || 4);
+  }
+
+  function upsert(input) {
+    const base = byId(input.id) || {};
+    const candidate = valid(
+      Object.assign({}, base, input, {
+        sold: base.sold || 0,
+        available: typeof input.available === "boolean" ? input.available : base.available !== false,
+      })
+    );
+    if (!candidate) return null;
+    const index = products.findIndex((product) => product.id === candidate.id);
+    if (index >= 0) products[index] = candidate;
+    else products.push(candidate);
+    commit();
+    return candidate;
+  }
+
+  function create(input) {
+    const slug = String(input.name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+    if (!slug) return null;
+    let id = `custom-${slug}`;
+    let attempt = 2;
+    while (byId(id)) {
+      id = `custom-${slug}-${attempt}`;
+      attempt += 1;
+      if (attempt > 40) return null;
     }
-  });
+    return upsert(Object.assign({}, input, { id, sold: 0, available: true }));
+  }
+
+  function remove(id) {
+    const index = products.findIndex((product) => product.id === String(id));
+    if (index < 0 || !String(id).startsWith("custom-")) return false;
+    products.splice(index, 1);
+    commit();
+    return true;
+  }
+
+  function toggle(id) {
+    const product = byId(id);
+    if (!product) return null;
+    product.available = !product.available;
+    commit();
+    return product;
+  }
+
+  function reset() {
+    safe(() => window.localStorage.removeItem(SC.config.keys.catalog));
+    load();
+    emit();
+  }
+
+  function subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
 
   SC.data = {
-    products,
     categories,
-    byId,
-    code,
-    isBestSeller,
-    categoryOf,
+    get products() {
+      return products;
+    },
     list,
-    setAvailability,
-    saveProduct,
-    removeProduct,
-    subscribeInventory,
+    byId,
+    category,
+    bestSellers,
+    fastest,
+    upsert,
+    create,
+    remove,
+    toggle,
+    reset,
+    subscribe,
   };
 })(window.SC || (window.SC = {}));

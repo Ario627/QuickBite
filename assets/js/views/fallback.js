@@ -2,48 +2,50 @@
   "use strict";
 
   const views = (SC.views = SC.views || {});
-  const { esc } = SC.dom;
 
-  function plain(config) {
-    return {
-      name: "plain",
-      title: `${config.title} — CanteenFlow AI`,
-      announce: config.announce || config.title,
-      el: SC.dom.html(`
-        <section class="shell">
-          <div class="plain" data-reveal>
-            ${config.eyebrow ? `<p class="eyebrow">${esc(config.eyebrow)}</p>` : ""}
-            <h1 class="plain__title">${esc(config.title)}</h1>
-            ${config.lead ? `<p class="plain__lead">${esc(config.lead)}</p>` : ""}
-            ${config.items ? `<ul class="plain__list">${config.items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}
-            <div class="plain__cta">
-              <a class="btn ${config.actionStyle || "btn--solid"}" href="#${config.actionPath || "/"}">${esc(config.actionLabel || "Kembali ke beranda")}</a>
-            </div>
-          </div>
-        </section>
-      `),
-    };
+  function shell(options) {
+    const el = SC.dom.html(`<div class="shell">
+      <div class="nf">
+        <p class="nf__code">${options.code}</p>
+        <div data-flap></div>
+        <h1 class="nf__title">${options.title}</h1>
+        <p>${options.body}</p>
+        <div class="hero__cta hero__cta--center">
+          <a class="btn btn--solid" href="#/">Ke beranda</a>
+          <a class="btn btn--line" href="#/menu">Buka menu</a>
+        </div>
+      </div>
+    </div>`);
+    const board = SC.flap.create(options.board, { className: "flap--amber" });
+    SC.dom.qs("[data-flap]", el).appendChild(board);
+    return el;
   }
 
   views.notFound = function notFound() {
-    return plain({
-      eyebrow: "404",
-      title: "Halaman tidak ditemukan",
-      lead: "Alamat yang kamu buka tidak ada di prototype ini. Gunakan navigasi untuk kembali ke alur pemesanan.",
-      items: ["Beranda menampilkan jalur dapur dan rekomendasi AI", "Papan menu memuat seluruh katalog dan filter kategori"],
-      actionPath: "/",
-      actionLabel: "Kembali ke beranda",
-    });
+    return {
+      name: "tidak-ditemukan",
+      title: "Halaman tidak ditemukan — QuickBite",
+      announce: "Halaman tidak ditemukan",
+      el: shell({
+        code: "kode 404",
+        board: "A404",
+        title: "Nomor ini tidak ada di papan",
+        body: "Alamat yang kamu tuju tidak terdaftar di papan antrean. Kembali ke beranda atau pilih menu untuk mengambil nomor baru.",
+      }),
+    };
   };
 
-  views.error = function error(ctx, cause) {
-    return plain({
-      eyebrow: "Galat",
-      title: "Terjadi kesalahan saat memuat halaman",
-      lead: `Rute ${ctx && ctx.path ? ctx.path : "-"} gagal dirender. Buka konsol peramban untuk melihat detail teknisnya.`,
-      items: [cause && cause.message ? cause.message : "Penyebab tidak diketahui"],
-      actionPath: "/",
-      actionLabel: "Kembali ke beranda",
-    });
+  views.error = function error(ctx, err) {
+    return {
+      name: "galat",
+      title: "Terjadi galat — QuickBite",
+      announce: "Terjadi galat",
+      el: shell({
+        code: "kode 500",
+        board: "A500",
+        title: "Sistem tersendat",
+        body: `Halaman gagal disusun: ${err && err.message ? err.message : "penyebab tidak diketahui"}. Coba muat ulang atau kembali ke beranda.`,
+      }),
+    };
   };
 })(window.SC || (window.SC = {}));

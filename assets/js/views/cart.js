@@ -2,146 +2,146 @@
   "use strict";
 
   const views = (SC.views = SC.views || {});
-  const { esc, qs } = SC.dom;
-
-  function lineMarkup(line, index) {
-    const item = SC.data.byId(line.productId);
-    const total = item.price * line.qty;
-    return `<li class="rline" style="--d:${index * 45}ms">
-      <span class="rline__qty">${line.qty}&times;</span>
-      <span class="rline__body">
-        <a class="rline__name" href="#/menu/${esc(item.id)}">${esc(item.name)}</a>
-        <span class="rline__meta">${SC.fmt.currency(item.price)} per porsi${line.note ? ` · catatan: ${esc(line.note)}` : ""}</span>
-      </span>
-      <span class="rline__sum">${SC.fmt.currency(total)}</span>
-      <span class="rline__act">
-        <span class="stepper stepper--mini">
-          <button type="button" data-bump="-1" data-key="${esc(line.key)}" aria-label="Kurangi ${esc(item.name)}">&minus;</button>
-          <span>${line.qty}</span>
-          <button type="button" data-bump="1" data-key="${esc(line.key)}" aria-label="Tambah ${esc(item.name)}">+</button>
-        </span>
-        <button type="button" class="rline__del" data-remove="${esc(line.key)}">hapus</button>
-      </span>
-    </li>`;
-  }
-
-  function receiptMarkup(lines) {
-    const units = SC.cart.count();
-    const subtotal = SC.cart.subtotal();
-    return `<div class="receipt" data-reveal>
-      <header class="receipt__head">
-        <p class="receipt__brand">CanteenFlow AI &middot; kantin sekolah</p>
-        <p class="receipt__title">Struk pesanan</p>
-        <p class="receipt__meta">${SC.fmt.number(lines.length)} jenis · ${SC.fmt.number(units)} porsi · ${SC.fmt.clock(new Date())}</p>
-      </header>
-      <ol class="receipt__lines">${lines.map(lineMarkup).join("")}</ol>
-      <dl class="receipt__totals">
-        <div><dt>Subtotal</dt><dd>${SC.fmt.currency(subtotal)}</dd></div>
-        <div><dt>Biaya layanan</dt><dd>tidak ada</dd></div>
-      </dl>
-      <p class="receipt__grand"><span>Total</span><strong>${SC.fmt.currency(subtotal)}</strong></p>
-      <div class="receipt__actions">
-        <a class="btn btn--solid btn--wide" href="#/checkout">Konfirmasi pesanan</a>
-        <button type="button" class="receipt__clear" data-clear>Kosongkan</button>
-      </div>
-      <p class="receipt__note">Nomor antrean terbit setelah kasir menerima pembayaran. Simpan kode bayar yang muncul di langkah berikutnya.</p>
-    </div>`;
-  }
-
-  function upsellMarkup() {
-    const recs = SC.recommend.forCart(SC.cart.lines(), 3);
-    if (!recs.length) return "";
-    return `<aside class="cart__upsell" data-reveal>
-      <p class="eyebrow">Rekomendasi AI</p>
-      <h2 class="cart__upsell-title">Sering ditambahkan</h2>
-      ${SC.ui.recList(recs)}
-    </aside>`;
-  }
+  const { esc } = SC.dom;
 
   views.cart = function cart() {
-    let armed = false;
-    let armTimer = 0;
-    let stop = null;
+    const el = SC.dom.html(`<div>
+      <div class="shell">
+        <header class="page__head">
+          <p class="eyebrow">Keranjang</p>
+          <h1 class="page__title">Periksa pesanan sebelum kunci nomor</h1>
+          <p class="page__sub">Nomor antrean baru terbit setelah pesanan dikunci. Sisa waktu layanan pesananmu ikut menentukan arus dapur.</p>
+        </header>
+        <div class="cartgrid">
+          <section class="ticket" data-rise>
+            <div class="ticket__body" data-lines></div>
+            <div class="ticket__cut"></div>
+            <div class="ticket__stub">
+              <dl class="mini">
+                <div class="mini__row"><dt>Nomor berikutnya</dt><dd data-next>A000</dd></div>
+                <div class="mini__row"><dt>Posisi saat ini</dt><dd data-pos>0</dd></div>
+                <div class="mini__row"><dt>Jam kantin</dt><dd data-clock>--:--</dd></div>
+              </dl>
+            </div>
+          </section>
+          <aside class="panel" data-rise>
+            <div class="panel__head">
+              <div>
+                <h2 class="panel__title">Ringkasan layanan</h2>
+                <p class="panel__hint">Waktu layan dijumlah dari tiap menu, lalu dibagi petugas paralel.</p>
+              </div>
+            </div>
+            <div class="panel__body stack">
+              <dl class="mini">
+                <div class="mini__row"><dt>Total porsi</dt><dd data-count-porsi>0</dd></div>
+                <div class="mini__row"><dt>Harga menu</dt><dd data-price>Rp0</dd></div>
+                <div class="mini__row"><dt>Waktu layan pesanan</dt><dd data-svc>&plusmn; 0 mnt</dd></div>
+                <div class="mini__row"><dt>Antrean di depan</dt><dd data-ahead>0 mnt</dd></div>
+                <div class="mini__row"><dt>Perkiraan mulai diproses</dt><dd data-start>&plusmn; 0 mnt</dd></div>
+              </dl>
+              <p class="svcnote">Item cepat seperti minuman boleh dipisah ke tiket lain supaya pesananmu tidak menahan antrean.</p>
+              <div class="stack stack--sm">
+                <button type="button" class="btn btn--solid btn--wide" data-commit>Ambil nomor antrean</button>
+                <button type="button" class="btn btn--ghost btn--wide" data-clear>Kosongkan keranjang</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>`);
 
-    const el = SC.dom.html('<section class="shell page cartpage"></section>');
+    const linesNode = SC.dom.qs("[data-lines]", el);
 
     function paint() {
-      const lines = SC.cart.lines();
+      const items = SC.cart.items();
+      const summary = SC.queue.summary();
+      const etaNew = SC.estimator.arrivalWait();
+      const ownService = SC.estimator.serviceEstimate(items) / summary.servers;
 
-      if (!lines.length) {
-        el.innerHTML = `
-          <header class="page-head" data-reveal>
-            <p class="eyebrow">02 / Keranjang</p>
-            <h1 class="page-head__title">Keranjang</h1>
-          </header>
-          ${SC.ui.empty({
-            title: "Keranjang masih kosong",
-            note: "Pilih menu lebih dulu, lalu atur jumlah porsi di halaman ini.",
-            action: { label: "Buka papan menu", attr: 'data-link="/menu"' },
-          })}`;
-        SC.ui.syncFeet(el);
-        return;
+      if (!items.length) {
+        linesNode.innerHTML = `<div class="empty">
+          <p class="empty__title">Keranjang kosong</p>
+          <p>Belum ada menu yang dipilih. Buka daftar menu untuk mulai menyusun pesanan.</p>
+          <a class="btn btn--solid" href="#/menu">Buka menu</a>
+        </div>`;
+      } else {
+        linesNode.innerHTML = items
+          .map(
+            (item) => `<div class="cartline">
+              <div>
+                <p class="cartline__name">${esc(item.product.name)}</p>
+                <p class="cartline__meta">
+                  <span class="cartline__svc">&plusmn; ${SC.fmt.minutes(item.service)} layan / porsi</span>
+                  <span>${esc(SC.fmt.currency(item.price))} per porsi</span>
+                </p>
+              </div>
+              <div class="cartline__side">
+                <div class="stepper">
+                  <button type="button" data-bump="${esc(item.id)}" data-dir="-" data-step="1" aria-label="Kurangi ${esc(item.product.name)}">&minus;</button>
+                  <output>${item.qty}</output>
+                  <button type="button" data-bump="${esc(item.id)}" data-step="1" aria-label="Tambah ${esc(item.product.name)}">+</button>
+                </div>
+                <span class="cartline__price">${esc(SC.fmt.currency(item.total))}</span>
+                <button type="button" class="btn btn--ghost btn--sm" data-remove="${esc(item.id)}">hapus</button>
+              </div>
+            </div>`
+          )
+          .join("");
       }
 
-      el.innerHTML = `
-        <header class="cart__head" data-reveal>
-          <p class="eyebrow">02 / Keranjang</p>
-          <h1 class="cart__title">Periksa sebelum bayar</h1>
-          <p class="cart__lead">Ubah jumlah porsi lewat tombol pada struk. Catatan dapur ikut tercetak di tiket pesanan.</p>
-        </header>
-        <div class="cart__grid">
-          <div>${receiptMarkup(lines)}</div>
-          ${upsellMarkup()}
-        </div>`;
-      SC.ui.syncFeet(el);
-      SC.motion.reveal(el);
-    }
+      const set = (key, text) => {
+        const node = SC.dom.qs(`[data-${key}]`, el);
+        if (node) node.textContent = text;
+      };
+      set("next", SC.fmt.queueNumber(SC.config.prefix, summary.seq + 1));
+      set("pos", items.length ? String(summary.activeCount + 1) : "0");
+      set("clock", SC.fmt.clock(summary.clock));
+      set("count-porsi", `${SC.cart.count()} porsi`);
+      set("price", SC.fmt.currency(SC.cart.total()));
+      set("svc", `± ${SC.fmt.minutes(SC.estimator.serviceEstimate(items))}`);
+      set("ahead", SC.fmt.minutes(etaNew));
+      set("start", items.length ? `± ${SC.fmt.minutes(etaNew)}` : "—");
 
-    function disarm() {
-      armed = false;
-      window.clearTimeout(armTimer);
-      const button = qs("[data-clear]", el);
-      if (button) button.textContent = "Kosongkan";
+      const commit = SC.dom.qs("[data-commit]", el);
+      if (commit) commit.disabled = !items.length;
+      const clear = SC.dom.qs("[data-clear]", el);
+      if (clear) clear.disabled = !items.length;
+      SC.motion.countAll(el);
     }
 
     SC.dom.on(el, "click", "[data-remove]", (event, node) => {
-      const item = SC.cart.lines().find((line) => line.key === node.dataset.remove);
-      const product = item ? SC.data.byId(item.productId) : null;
       SC.cart.remove(node.dataset.remove);
-      if (product) SC.layout.toast(`${product.name} dihapus dari keranjang`);
     });
 
     SC.dom.on(el, "click", "[data-clear]", () => {
-      if (!armed) {
-        armed = true;
-        qs("[data-clear]", el).textContent = "Tekan lagi untuk mengosongkan";
-        armTimer = window.setTimeout(disarm, 3200);
-        return;
-      }
       SC.cart.clear();
-      disarm();
       SC.layout.toast("Keranjang dikosongkan");
     });
 
-    SC.dom.on(el, "click", "[data-link]", (event, node) => {
-      SC.router.go(node.dataset.link);
+    SC.dom.on(el, "click", "[data-commit]", () => {
+      const ticket = SC.queue.enqueue();
+      if (!ticket) return;
+      SC.cart.clear();
+      SC.layout.toast(`Nomor ${ticket.number} terbit`);
+      SC.router.go(`/tiket/${ticket.id}`);
     });
 
+    let unsubCart = null;
+    let unsubQueue = null;
+
     return {
-      name: "cart",
-      title: "Keranjang — CanteenFlow AI",
+      name: "keranjang",
+      title: "Keranjang — QuickBite",
       announce: "Halaman keranjang",
       el,
       mount() {
         paint();
-        stop = SC.cart.subscribe(() => {
-          if (armed) disarm();
-          paint();
-        });
+        unsubCart = SC.cart.subscribe(paint);
+        unsubQueue = SC.queue.subscribe(paint);
       },
       destroy() {
-        if (stop) stop();
-        window.clearTimeout(armTimer);
+        if (unsubCart) unsubCart();
+        if (unsubQueue) unsubQueue();
       },
     };
   };

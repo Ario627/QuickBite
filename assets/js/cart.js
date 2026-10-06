@@ -1,10 +1,8 @@
 (function (SC) {
   "use strict";
 
-  const KEY = SC.config.keys.cart;
-  const MAX_QTY = 20;
-  const NOTE_LIMIT = 80;
   const listeners = new Set();
+  const lines = new Map();
 
   function safe(fn) {
     try {
@@ -14,137 +12,122 @@
     }
   }
 
-  function lineKey(productId, note) {
-    return note ? `${productId}#${SC.fmt.hash(note)}` : productId;
-  }
-
-  function noteOf(value) {
-    return typeof value === "string" ? value.trim().slice(0, NOTE_LIMIT) : "";
-  }
-
-  function sanitize(raw) {
-    if (!raw || typeof raw !== "object") return null;
-    const product = SC.data.byId(raw.productId);
-    if (!product) return null;
-    const note = noteOf(raw.note);
-    const qty = SC.fmt.clamp(Math.round(Number(raw.qty) || 0), 0, MAX_QTY);
-    if (qty < 1) return null;
-    return { key: lineKey(product.id, note), productId: product.id, note, qty };
-  }
-
-  function read() {
-    const parsed = safe(() => JSON.parse(window.localStorage.getItem(KEY) || "[]"));
-    return Array.isArray(parsed) ? parsed.map(sanitize).filter(Boolean) : [];
-  }
-
-  let lines = read();
-
-  function write() {
-    safe(() => window.localStorage.setItem(KEY, JSON.stringify(lines)));
+  function snapshot() {
+    const items = [];
+    lines.forEach((qty, id) => {
+      const product = SC.data.byId(id);
+      if (!product) return;
+      items.push({
+        id,
+        product,
+        qty,
+        price: product.price,
+        total: product.price * qty,
+        service: product.service,
+        serviceTotal: product.service * qty,
+      });
+    });
+    return items;
   }
 
   function emit() {
-    write();
-    const payload = list();
-    listeners.forEach((listener) => listener(payload));
+    const items = snapshot();
+    listeners.forEach((listener) => listener(items));
   }
 
-  window.addEventListener("storage", (event) => {
-    if (event.key !== KEY) return;
-    lines = read();
-    const payload = list();
-    listeners.forEach((listener) => listener(payload));
-  });
-
-  function list() {
-    return lines.slice();
+  function persist() {
+    safe(() => window.localStorage.setItem(SC.config.keys.cart, JSON.stringify(Array.from(lines.entries()))));
   }
 
-  function lineFor(productId) {
-    return lines.find((line) => line.productId === productId && !line.note) || null;
+  function commit() {
+    persist();
+    emit();
   }
 
-  function find(key) {
-    return lines.find((line) => line.key === key) || null;
+  function load() {
+    const stored = safe(() => JSON.parse(window.localStorage.getItem(SC.config.keys.cart) || "[]"));
+    if (!Array.isArray(stored)) return;
+    stored.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length !== 2) return;
+      const id = String(entry[0]);
+      const qty = Math.floor(Number(entry[1]));
+      if (!SC.data.byId(id) || !Number.isFinite(qty) || qty < 1) return;
+      lines.set(id, Math.min(20, qty));
+    });
   }
 
-  function qtyOf(productId) {
-    return lines.reduce((total, line) => (line.productId === productId ? total + line.qty : total), 0);
-  }
+  load();
 
-  function count() {
-    return lines.reduce((total, line) => total + line.qty, 0);
-  }
-
-  function subtotal() {
-    return lines.reduce((total, line) => {
-      const product = SC.data.byId(line.productId);
-      return product ? total + product.price * line.qty : total;
-    }, 0);
-  }
-
-  function add(productId, options) {
-    const product = SC.data.byId(productId);
+  function add(id, qty) {
+    const product = SC.data.byId(id);
     if (!product || !product.available) return null;
-    const settings = options || {};
-    const note = noteOf(settings.note);
-    const qty = SC.fmt.clamp(Math.round(Number(settings.qty) || 1), 1, MAX_QTY);
-    const key = lineKey(product.id, note);
-    const existing = find(key);
-
-    if (existing) existing.qty = SC.fmt.clamp(existing.qty + qty, 1, MAX_QTY);
-    else lines.push({ key, productId: product.id, note, qty });
-
-    emit();
-    return key;
+    const amount = Math.max(1, Math.floor(Number(qty) || 1));
+    const next = Math.min(20, (lines.get(id) || 0) + amount);
+    lines.set(id, next);
+    commit();
+    return { id, qty: next };
   }
 
-  function setQty(key, qty) {
-    const line = find(key);
-    if (!line) return;
-    const next = Math.round(Number(qty) || 0);
-    if (next < 1) return remove(key);
-    line.qty = SC.fmt.clamp(next, 1, MAX_QTY);
-    emit();
+  function setQty(id, qty) {
+    const amount = Math.floor(Number(qty));
+    if (!Number.isFinite(amount) || amount < 1) return remove(id);
+    if (!SC.data.byId(id)) return null;
+    lines.set(id, Math.min(20, amount));
+    commit();
+    return { id, qty: lines.get(id) };
   }
 
-  function bump(key, delta) {
-    const line = find(key);
-    if (!line) return;
-    setQty(key, line.qty + Math.round(Number(delta) || 0));
+  function bump(id, delta) {
+    const current = lines.get(id) || 0;
+    return setQty(id, current + Number(delta));
   }
 
-  function remove(key) {
-    const next = lines.filter((line) => line.key !== key);
-    if (next.length === lines.length) return;
-    lines = next;
-    emit();
+  function remove(id) {
+    const existed = lines.delete(id);
+    if (existed) commit();
+    return existed;
   }
 
   function clear() {
-    if (!lines.length) return;
-    lines = [];
-    emit();
+    if (!lines.size) return;
+    lines.clear();
+    commit();
   }
 
-  function subscribe(listener) {
+  function count() {
+    let total = 0;
+    lines.forEach((qty) => {
+      total += qty;
+    });
+    return total;
+  }
+
+  function total() {
+    let sum = 0;
+    lines.forEach((qty, id) => {
+      const product = SC.data.byId(id);
+      if (product) sum += product.price * qty;
+    });
+    return sum;
+  }
+
+  function service() {
+    let sum = 0;
+    lines.forEach((qty, id) => {
+      const product = SC.data.byId(id);
+      if (product) sum += product.service * qty;
+    });
+    return sum;
+  }
+
+  function items() {
+    return snapshot();
+  }
+
+  function subscription(listener) {
     listeners.add(listener);
     return () => listeners.delete(listener);
   }
 
-  SC.cart = {
-    lines: list,
-    lineFor,
-    qtyOf,
-    count,
-    subtotal,
-    add,
-    setQty,
-    bump,
-    remove,
-    clear,
-    subscribe,
-    MAX_QTY,
-    NOTE_LIMIT,
-  };
+  SC.cart = { add, setQty, bump, remove, clear, count, total, service, items, subscribe: subscription };
 })(window.SC || (window.SC = {}));

@@ -5,230 +5,269 @@
   const { esc } = SC.dom;
 
   const STEPS = [
-    { index: "01", title: "Pilih dari kelas", body: "Buka papan menu, atur porsi, tulis catatan untuk dapur." },
-    { index: "02", title: "Bayar di kasir", body: "Tunjukkan kode bayar. Kasir menerima QRIS atau tunai." },
-    { index: "03", title: "Nomor terbit", body: "Pembayaran diterima, nomor antrean masuk jalur FIFO." },
-    { index: "04", title: "Ambil saat siap", body: "Layar memanggil nomormu. Ambil di meja pengambilan." },
+    { no: "01", title: "Pilih menu", body: "Menentukan berapa lama dapur bekerja." },
+    { no: "02", title: "Kunci nomor", body: "Nomor masuk jalur FIFO, bukan antrean fisik." },
+    { no: "03", title: "Pantau posisi", body: "Posisi dan estimasi bergerak setiap pesanan selesai." },
+    { no: "04", title: "Datang saat giliran", body: "Panggilan muncul di posisi tiga dan satu." },
   ];
 
-  function boardHud() {
-    return `<div class="bb__hud">
-      <div class="bb__now">
-        <p class="bb__label">Sedang disiapkan</p>
-        <p class="bb__value" data-live-processing data-flip>&mdash;</p>
-      </div>
-      <dl class="bb__rows">
-        <div><dt>Siap diambil</dt><dd data-live-ready>&mdash;</dd></div>
-        <div><dt>Dalam antrean</dt><dd data-live-queued>&mdash;</dd></div>
-        <div><dt>Estimasi tunggu</dt><dd data-live-eta>&mdash;</dd></div>
-      </dl>
-      <a class="bb__link" href="#/queue">Buka layar antrean</a>
+  function forecastSlot(slot, options) {
+    const settings = options || {};
+    const note = settings.now ? esc(slot.note || "") : `${slot.count} pesanan`;
+    return `<div class="forecast__slot"${settings.now ? ' data-now="true"' : ""}${settings.best ? ' data-best="true"' : ""}>
+      <p class="forecast__time">${esc(slot.label)}</p>
+      <p class="forecast__val">${SC.fmt.eta(slot.wait)}</p>
+      <p class="forecast__note">${note}</p>
     </div>`;
   }
 
-  function pairRow(pair) {
-    return `<li class="pairrow" style="--d:__D__ms">
-      <span class="pairrow__conf">
-        <span class="pairrow__num">${SC.fmt.percent(pair.confidence)}</span>
-        <span class="pairrow__bar">${SC.ui.meter(pair.confidence, "mint")}</span>
-      </span>
-      <span class="pairrow__body">
-        <span class="pairrow__pair"><a href="#/menu/${esc(pair.a.id)}">${esc(pair.a.name)}</a> <em>+</em> <a href="#/menu/${esc(pair.b.id)}">${esc(pair.b.name)}</a></span>
-        <span class="pairrow__meta">${SC.fmt.number(pair.count)} transaksi mencatat pasangan ini</span>
-      </span>
-      <button type="button" class="add-btn add-btn--sm" data-add="${esc(pair.b.id)}" aria-label="Tambah ${esc(pair.b.name)} ke keranjang">+</button>
-    </li>`;
-  }
-
   views.home = function home() {
-    const dateLabel = new Intl.DateTimeFormat("id-ID", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    }).format(new Date());
-    const menuCount = SC.data.products.length;
-    const insight = SC.recommend.insight();
-    const forYou = SC.recommend.forYou(4);
-    const pairs = SC.recommend.topPairs(3);
-    const favorite = SC.data.list({ sort: "populer" }).slice(0, 5);
+    const insight = SC.analytics.insight();
+    const fastest = SC.data.fastest(4);
 
-    const el = SC.dom.html(`<div data-home>
-      <section class="masthead">
+    const el = SC.dom.html(`<div>
+      <section class="hero" data-spot>
+        <div class="shell hero__grid">
+          <div>
+            <p class="eyebrow"><span class="dot"></span> papan langsung kantin</p>
+            <h1 class="hero__title" data-rise="mask">Antrean kantin, tanpa berdiri di depan loket.</h1>
+            <p class="hero__sub" data-rise>
+              Pilih menu, ambil nomor, lalu kembali saat giliranmu mendekat. Estimasi dihitung dari waktu layan tiap menu,
+              jumlah petugas, dan catatan layanan hari ini.
+            </p>
+            <div class="hero__cta" data-rise>
+              <a class="btn btn--solid" data-magnet href="#/menu">Ambil nomor antrean</a>
+              <a class="btn btn--line" data-magnet href="#/papan">Buka papan kantin</a>
+            </div>
+            <div class="hero__flag" data-flag data-rise></div>
+          </div>
+          <div class="hero__stage" data-rise="scale">
+            <div class="stage" data-stage>
+              <p class="stage__corner"><span class="dot"></span> unit papan mekanis</p>
+              <div class="stage__fallback" data-fallback>
+                <p class="stage__caption">nomor sedang dilayani</p>
+              </div>
+            </div>
+            <div class="stage__specs">
+              <span class="chip">4 modul &middot; 37 flap</span>
+              <span class="chip">papan fisik 3D</span>
+              <span class="chip" data-v="spec-eta">&plusmn; 0 mnt</span>
+            </div>
+            <p class="stage__note">Geser kursor di atas papan untuk mengubah sudut pandang. Papan bergetar setiap digit berganti.</p>
+          </div>
+        </div>
         <div class="shell">
-          <div class="masthead__bar">
-            <span>Kantin sekolah &middot; prototipe</span>
-            <span>${esc(dateLabel)}</span>
-            <span>edisi MVP</span>
-          </div>
-          <h1 class="masthead__title">
-            <span class="masthead__line masthead__line--solid">Canteen</span>
-            <span class="masthead__line masthead__line--hollow">Flow</span>
-          </h1>
-          <div class="masthead__foot">
-            <p class="masthead__lead">Digitalisasi kantin sekolah: papan menu, kode bayar untuk kasir, dan antrean FIFO yang bisa dipantau dari kelas. Semua berjalan di peramban, tanpa server.</p>
-            <ul class="masthead__facts">
-              <li><strong data-count="${menuCount}">0</strong><span>menu aktif</span></li>
-              <li><strong data-count="${insight.transactions}">0</strong><span>transaksi dianalisis AI</span></li>
-              <li><strong>FIFO</strong><span>urutan diproses</span></li>
-            </ul>
-            <div class="masthead__cta">
-              <a class="btn btn--solid" href="#/menu">Buka papan menu</a>
-              <a class="btn btn--line" href="#/orders">Pesanan saya</a>
+          <dl class="instr mt-2" data-cols="4" data-rise="lift" data-stagger="70">
+            <div class="instr__cell">
+              <dt>Menunggu</dt>
+              <dd><span data-v="waiting">0</span><small>orang</small></dd>
             </div>
-          </div>
-        </div>
-      </section>
-
-      ${SC.layout.tickerMarkup([
-        "Antrean FIFO",
-        "bayar di kasir",
-        "kode bayar per pesanan",
-        "rekomendasi AI dari pola belanja",
-        "layar antrean untuk monitor kantin",
-      ])}
-
-      <section class="board-band">
-        <div class="shell board-band__head" data-reveal>
-          <p class="eyebrow eyebrow--night">Simulasi jalur dapur</p>
-          <h2 class="board-band__title">Setiap pesanan bergerak satu arah.</h2>
-          <p class="board-band__hint">Kubus bernomor pada belt mewakili pesanan nyata: antre, disiapkan, lalu siap diambil. Pandangan belt ini bisa digeser dengan kursor.</p>
-        </div>
-        ${SC.ui.stageMarkup("board")}
-        ${boardHud()}
-      </section>
-
-      <section class="band">
-        <div class="shell panel-grid">
-          <div class="panel-grid__main">
-            ${SC.ui.sectionHead({
-              eyebrow: "Papan menu",
-              title: "Paling dicari minggu ini",
-              hint: "Lima menu dengan penjualan tertinggi.",
-              action: { path: "/menu", label: "Semua menu" },
-            })}
-            <ol class="mrows" data-reveal>${SC.ui.menuRows(favorite)}</ol>
-          </div>
-          <aside class="panel-grid__side" data-reveal>
-            <p class="eyebrow">Cara kerja AI</p>
-            <ol class="pipe">
-              <li><span class="pipe__no">01</span>Data pesanan</li>
-              <li><span class="pipe__no">02</span>Pola pasangan menu</li>
-              <li><span class="pipe__no">03</span>Rekomendasi untukmu</li>
-            </ol>
-            <p class="panel-grid__note">Mesin rekomendasi menghitung co-occurrence dari ${SC.fmt.number(insight.transactions)} transaksi kantin, lalu menyarankan pelengkap saat kamu memilih menu.</p>
-            <a class="btn btn--line btn--wide" href="#/menu">Coba rekomendasinya</a>
-          </aside>
-        </div>
-      </section>
-
-      <section class="band band--paper">
-        <div class="shell">
-          ${SC.ui.sectionHead({
-            eyebrow: "Rekomendasi AI",
-            title: "Untukmu",
-            hint: "Berubah mengikuti riwayat pesanan di perangkat ini.",
-          })}
-          <div class="ai-grid">
-            <div data-reveal>
-              <p class="ai-grid__label">Disusun dari kebiasaanmu</p>
-              ${SC.ui.recList(forYou)}
+            <div class="instr__cell">
+              <dt>Estimasi tunggu</dt>
+              <dd data-tone="amber"><span data-v="eta">tanpa tunggu</span></dd>
             </div>
-            <div data-reveal>
-              <p class="ai-grid__label">Pasangan terkuat kantin</p>
-              <ol class="pairrows">${
-                pairs.length
-                  ? pairs.map((pair, index) => pairRow(pair).replace("__D__", String(index * 70))).join("")
-                  : '<li class="pairrow pairrow--empty">Belum ada pasangan yang cukup kuat.</li>'
-              }</ol>
-              <p class="ai-grid__note">Persentase dihitung dari porsi pesanan yang memuat salah satu menu lalu menambahkan pasangannya.</p>
+            <div class="instr__cell">
+              <dt>Petugas paralel</dt>
+              <dd><span data-v="servers">2</span><small>dapur</small></dd>
             </div>
-          </div>
+            <div class="instr__cell">
+              <dt>Kondisi</dt>
+              <dd><span data-v="crowd">NORMAL</span></dd>
+            </div>
+          </dl>
         </div>
       </section>
 
       <section class="band">
         <div class="shell">
-          ${SC.ui.sectionHead({
-            eyebrow: "Alur pemesanan",
-            title: "Empat langkah",
-            hint: "Dari meja kelas sampai meja pengambilan.",
-          })}
-          <ol class="flow" data-reveal>
+          <div class="sechead" data-rise>
+            <div>
+              <p class="eyebrow">prakiraan</p>
+              <h2 class="sechead__title">Kapan sebaiknya datang</h2>
+              <p class="sechead__hint">Disusun dari pola permintaan tujuh hari terakhir dan sisa layanan yang sedang berjalan.</p>
+            </div>
+            <div class="sechead__side">
+              <span class="chip" data-tone="calm" data-v="reco">SEKARANG</span>
+            </div>
+          </div>
+          <div class="forecast" data-forecast data-rise="lift"></div>
+        </div>
+      </section>
+
+      <section class="band">
+        <div class="shell grid2">
+          <div data-rise>
+            <div class="sechead">
+              <div>
+                <p class="eyebrow">paling cepat</p>
+                <h2 class="sechead__title">Menu dengan waktu layan pendek</h2>
+              </div>
+              <div class="sechead__side">
+                <a class="btn btn--line btn--sm" href="#/menu">Semua menu</a>
+              </div>
+            </div>
+            <ul class="menulist" data-stagger="45">${fastest.map((product, index) => SC.parts.menuRow(product, index + 1)).join("")}</ul>
+          </div>
+          <details class="fold" data-rise>
+            <summary>Bagaimana angka ini dihitung</summary>
+            <div class="fold__body stack stack--sm">
+              <p class="svcnote">Estimasi tunggu = sisa waktu layanan di depan dibagi jumlah petugas, lalu dikalikan faktor kalibrasi dapur.</p>
+              <dl class="mini">
+                <div class="mini__row"><dt>Sisa layanan di depan</dt><dd data-v="ahead">0 mnt</dd></div>
+                <div class="mini__row"><dt>Petugas paralel</dt><dd data-v="servers2">2</dd></div>
+                <div class="mini__row"><dt>Faktor kalibrasi</dt><dd data-v="factor">1,00&times;</dd></div>
+                <div class="mini__row"><dt>Estimasi tunggu</dt><dd data-v="ewt">tanpa tunggu</dd></div>
+              </dl>
+              <p class="svcnote">Faktor dibaca dari catatan layanan selesai hari ini dan model ${SC.fmt.number(
+                insight.tickets
+              )} pesanan sepekan.</p>
+              <a class="btn btn--line btn--wide" href="#/papan/analitik">Buka analitik</a>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="band">
+        <div class="shell">
+          <div class="sechead" data-rise>
+            <div>
+              <p class="eyebrow">alur</p>
+              <h2 class="sechead__title">Empat langkah</h2>
+            </div>
+          </div>
+          <ol class="steps" data-rise="lift" data-stagger="60">
             ${STEPS.map(
               (step) =>
-                `<li class="flow__step"><span class="flow__no">${step.index}</span><h3 class="flow__title">${esc(step.title)}</h3><p class="flow__body">${esc(step.body)}</p></li>`
+                `<li class="steps__item"><span class="steps__no">${step.no}</span><h3 class="steps__title">${esc(
+                  step.title
+                )}</h3><p class="steps__body">${esc(step.body)}</p></li>`
             ).join("")}
           </ol>
         </div>
       </section>
-
-      <section class="manifest">
-        <div class="shell manifest__grid">
-          <div data-reveal>
-            <p class="eyebrow eyebrow--night">Status sistem</p>
-            <h2 class="manifest__title">Sudah berjalan</h2>
-            <ul class="manifest__list">
-              <li>Papan menu, pencarian, filter, dan kelola stok</li>
-              <li>Kode bayar dan konfirmasi pembayaran kasir</li>
-              <li>Antrean FIFO dengan layar monitor kantin</li>
-              <li>Rekomendasi AI dari pola transaksi</li>
-            </ul>
-          </div>
-          <div data-reveal>
-            <p class="eyebrow eyebrow--night">Menyusul</p>
-            <h2 class="manifest__title manifest__title--muted">Tahap lanjut</h2>
-            <ul class="manifest__list manifest__list--muted">
-              <li>QRIS asli lewat payment gateway</li>
-              <li>Notifikasi push saat siap diambil</li>
-              <li>Analitik penjualan harian</li>
-              <li>Kamera AI untuk memantau kepadatan kantin</li>
-            </ul>
-          </div>
-        </div>
-      </section>
     </div>`);
 
-    let stopOrders = null;
+    const fallbackHost = SC.dom.qs("[data-fallback]", el);
+    let fallbackBoard = null;
     let stage = null;
+    let unsubscribe = null;
 
-    function paintLive() {
-      const board = SC.orders.board();
-      const processing = board.processing[0];
-      const line = (name) => SC.dom.qs(`[data-live-${name}]`, el);
-      const now = line("processing");
+    function value(key) {
+      return SC.dom.qs(`[data-v="${key}"]`, el);
+    }
 
-      if (now) {
-        const next = processing ? processing.number : "\u2014";
-        if (now.textContent !== next) {
-          now.textContent = next;
-          if (processing) SC.motion.flip(now);
+    function paintFlag() {
+      const host = SC.dom.qs("[data-flag]", el);
+      const mine = SC.queue.mine(false)[0] || null;
+      if (mine) {
+        const state = SC.estimator.ticketState(mine);
+        host.innerHTML = `<div class="pkbanner">
+          <span class="pkbanner__no">${esc(mine.number)}</span>
+          <div class="pkbanner__body">
+            <p class="notice__title">${esc(state.text)}</p>
+            <p>${esc(SC.parts.itemsSummary(mine))}</p>
+          </div>
+          <a class="btn btn--line btn--sm" href="#/tiket/${esc(mine.id)}">Buka tiket</a>
+        </div>`;
+        return;
+      }
+      const crowd = SC.estimator.crowd();
+      const rec = SC.estimator.recommendation();
+      const tone = crowd.tone === "coral" ? "coral" : crowd.tone === "mint" ? "mint" : "amber";
+      const body = rec.crowded
+        ? rec.text
+        : `Estimasi nomor baru ${SC.fmt.eta(crowd.eta)} dengan ${crowd.processing} pesanan di dapur.`;
+      host.innerHTML = `<div class="notice" data-tone="${tone}">
+        <div>
+          <p class="notice__title">${esc(crowd.label)} &middot; ${esc(crowd.advice)}</p>
+          <p class="notice__body">${esc(body)}</p>
+        </div>
+      </div>`;
+    }
+
+    function paintForecast() {
+      const host = SC.dom.qs("[data-forecast]", el);
+      const crowd = SC.estimator.crowd();
+      const slots = SC.analytics.forecast(5);
+      const best = slots.length
+        ? slots.reduce((winner, slot) => (slot.wait < winner.wait ? slot : winner), slots[0])
+        : null;
+      host.innerHTML =
+        forecastSlot(
+          {
+            label: SC.fmt.clock(SC.queue.minutesOfDay()),
+            wait: crowd.eta,
+            count: crowd.waiting,
+            note: `kondisi ${crowd.label.toLowerCase()}`,
+          },
+          { now: true }
+        ) +
+        slots.map((slot) => forecastSlot(slot, { best: Boolean(best && slot.index === best.index) })).join("");
+      const tag = value("reco");
+      if (tag) {
+        if (best && crowd.level === "ramai") {
+          tag.dataset.tone = "peak";
+          tag.textContent = `DISARANKAN ${best.label}`;
+        } else {
+          tag.dataset.tone = "calm";
+          tag.textContent = "SEKARANG WAKTU TEPAT";
         }
       }
+    }
 
-      const ready = line("ready");
-      if (ready) ready.textContent = board.ready.length ? board.ready.map((order) => order.number).join(" ") : "\u2014";
+    function paintBoard() {
+      const summary = SC.queue.summary();
+      const crowd = SC.estimator.crowd();
+      const calibration = SC.analytics.calibration();
+      const set = (key, text) => {
+        const node = value(key);
+        if (node) node.textContent = text;
+      };
+      set("waiting", SC.fmt.number(summary.waiting.length));
+      set("eta", SC.fmt.eta(crowd.eta));
+      set("servers", String(summary.servers));
+      set("crowd", crowd.label);
+      set("spec-eta", SC.fmt.eta(crowd.eta));
 
-      const queued = line("queued");
-      if (queued) queued.textContent = board.queued.length ? `${SC.fmt.number(board.queued.length)} pesanan` : "kosong";
+      const cell = SC.dom.qs('[data-v="crowd"]', el);
+      if (cell && cell.parentElement) {
+        cell.parentElement.dataset.tone = crowd.tone === "mint" ? "mint" : crowd.tone === "coral" ? "coral" : "amber";
+      }
 
-      const eta = line("eta");
-      if (eta) eta.textContent = board.activeCount ? `\u00b1 ${SC.fmt.number(board.eta)} menit` : "\u2014";
+      const ahead = SC.queue
+        .active()
+        .reduce((sum, ticket) => sum + SC.estimator.remaining(ticket, summary.clock), 0);
+      set("ahead", SC.fmt.minutes(ahead));
+      set("servers2", String(summary.servers));
+      set("factor", `${calibration.factor.toFixed(2).replace(".", ",")}×`);
+      set("ewt", SC.fmt.eta(crowd.eta));
 
-      if (stage) stage.refresh();
+      const serving = SC.queue.nowServing();
+      const text = serving ? serving.number : "A---";
+      if (stage) stage.set(text);
+      if (fallbackBoard) fallbackBoard.set(text);
+    }
+
+    function paint() {
+      paintFlag();
+      paintForecast();
+      paintBoard();
     }
 
     return {
-      name: "home",
-      title: "CanteenFlow AI — Pesan kantin tanpa antre",
-      announce: "Beranda CanteenFlow AI",
+      name: "beranda",
+      title: "QuickBite — antrean kantin tanpa berdiri",
+      announce: "Beranda QuickBite",
       el,
       mount() {
-        paintLive();
-        stopOrders = SC.orders.subscribe(paintLive);
-        stage = SC.ui.attachStage(SC.dom.qs("[data-stage]", el), () => SC.ui.fifoShape(SC.orders.board()));
+        fallbackBoard = SC.flap.create("A---", { className: "flap--lg flap--amber", stagger: 90 });
+        fallbackHost.appendChild(fallbackBoard);
+        stage = SC.stage.mount(SC.dom.qs("[data-stage]", el));
+        paint();
+        unsubscribe = SC.queue.subscribe(paint);
       },
       destroy() {
-        if (stopOrders) stopOrders();
+        if (unsubscribe) unsubscribe();
         if (stage) stage.destroy();
       },
     };

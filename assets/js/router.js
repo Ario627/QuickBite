@@ -74,11 +74,11 @@
       window.console.error(error);
     }
 
-    if (!view) view = SC.views.error(ctx, new Error("handler tidak mengembalikan view"));
+    if (!view) view = SC.views.error(ctx, new Error("view kosong"));
 
-    document.title = view.title || "CanteenFlow AI";
+    document.title = view.title || "QuickBite";
     document.body.dataset.route = ctx.path;
-    document.body.dataset.view = view.name || ctx.path.replace(/\W+/g, "") || "home";
+    document.body.dataset.view = view.name || ctx.path.replace(/\W+/g, "") || "beranda";
 
     outlet.replaceChildren(view.el);
 
@@ -86,8 +86,11 @@
     active = view;
 
     SC.layout.syncNav(ctx.path);
-    SC.motion.enter(outlet);
-    SC.motion.awake(outlet);
+    SC.layout.enter(outlet);
+    SC.motion.wake(outlet);
+    SC.motion.countAll(outlet);
+    SC.motion.fresh(outlet);
+
     if (first) {
       first = false;
     } else {

@@ -1,75 +1,91 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --paper: #e7ebdd;
-  --paper-2: #f2f4e9;
-  --surface: #ffffff;
-  --surface-2: #f7f8f1;
+  --void: #0a0b0d;
+  --void-2: #0d0f12;
+  --panel: #121417;
+  --panel-2: #181b1f;
+  --panel-3: #1f2328;
+  --line: #24282d;
+  --line-2: #31363d;
+  --line-3: #454c54;
 
-  --ink: #0d0f0b;
-  --ink-2: #474b3f;
-  --ink-3: #83877a;
-  --line: #c3c8b2;
-  --line-2: #dde1d0;
+  --paper: #f1f2ed;
+  --paper-2: #cfd2cb;
+  --dim: #99a1a8;
+  --dim-2: #6c747c;
+  --dim-3: #4a5158;
 
-  --lime: #cbf01c;
-  --lime-2: #a9cb0d;
-  --lime-wash: #eefabb;
+  --amber: #ffb01f;
+  --amber-2: #d78e0a;
+  --amber-wash: rgba(255, 176, 31, 0.1);
 
-  --vermilion: #d43a20;
-  --vermilion-wash: #fbe3dd;
+  --mint: #46d69b;
+  --mint-wash: rgba(70, 214, 155, 0.11);
 
-  --amber: #8a5a00;
-  --amber-wash: #f6e9cf;
+  --coral: #ff5233;
+  --coral-wash: rgba(255, 82, 51, 0.12);
 
-  --teal: #0a6252;
-  --teal-wash: #d7ebe5;
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --f-text: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "Martian Mono", ui-monospace, "Cascadia Mono", "SFMono-Regular", monospace;
 
-  --grey: #6b6f62;
-  --grey-wash: #e2e5d6;
-
-  --night: #0d0f0b;
-  --night-2: #171b12;
-  --night-3: #1f2517;
-  --night-line: #333b2a;
-  --night-ink: #edf1e0;
-  --night-ink-2: #a3aa94;
-
-  --cat-makanan-tint: #f0f6d2;
-  --cat-makanan-tone: #6f7c2f;
-  --cat-minuman-tint: #dbece7;
-  --cat-minuman-tone: #33695f;
-  --cat-snack-tint: #f7ecd7;
-  --cat-snack-tone: #86622a;
-
-  --bw: 2px;
-  --hard: 5px 5px 0 var(--ink);
-  --r-1: 2px;
-  --r-2: 4px;
-  --r-full: 999px;
-
-  --shell: 1180px;
-  --gutter: clamp(1rem, 4vw, 2.5rem);
-  --head-h: 64px;
-  --tabbar-h: 60px;
-
-  --f-display: "Archivo", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --f-text: "Karla", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --f-mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-
-  --t-2xs: 0.6875rem;
-  --t-xs: 0.75rem;
+  --t-3xs: 0.5625rem;
+  --t-2xs: 0.625rem;
+  --t-xs: 0.6875rem;
   --t-sm: 0.8125rem;
   --t-md: 0.9375rem;
   --t-lg: 1.0625rem;
-  --t-xl: clamp(1.15rem, 1.05rem + 0.4vw, 1.4rem);
-  --t-2xl: clamp(1.4rem, 1.15rem + 1vw, 1.95rem);
-  --t-3xl: clamp(1.9rem, 1.4rem + 2.2vw, 3rem);
-  --t-4xl: clamp(2.4rem, 1.5rem + 3.8vw, 4.6rem);
+  --t-xl: clamp(1.15rem, 1.02rem + 0.5vw, 1.5rem);
+  --t-2xl: clamp(1.4rem, 1.15rem + 1.3vw, 2.15rem);
+  --t-3xl: clamp(1.75rem, 1.25rem + 2.8vw, 3.3rem);
+  --t-4xl: clamp(2rem, 1.1rem + 4.2vw, 4.4rem);
+
+  --r-1: 2px;
+  --r-2: 3px;
+  --r-3: 5px;
+  --r-4: 8px;
+  --r-full: 999px;
+
+  --shell: 1120px;
+  --gutter: clamp(1.05rem, 4.5vw, 2.25rem);
+  --head-h: 56px;
+  --rail-h: 32px;
+  --tab-h: 58px;
+  --stage-h: 260px;
+
+  --cell-w: 46px;
+  --cell-h: 60px;
+  --cell-w-sm: 32px;
+  --cell-h-sm: 42px;
+  --cell-w-lg: 62px;
+  --cell-h-lg: 82px;
 
   --ease: cubic-bezier(0.2, 0.75, 0.25, 1);
-  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-mech: cubic-bezier(0.5, 0.05, 0.55, 0.95);
+  --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
   --dur: 0.16s;
   --dur-2: 0.24s;
-  --dur-3: 0.5s;
+  --dur-3: 0.42s;
+
+  --glow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+@media (min-width: 600px) {
+  :root {
+    --cell-w: 54px;
+    --cell-h: 70px;
+    --cell-w-lg: 72px;
+    --cell-h-lg: 96px;
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --cell-w: 60px;
+    --cell-h: 78px;
+    --cell-w-lg: 82px;
+    --cell-h-lg: 110px;
+    --stage-h: 440px;
+  }
 }
